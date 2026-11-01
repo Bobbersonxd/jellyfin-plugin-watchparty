@@ -10,7 +10,7 @@ Let your Discord watch party run the movie night. Friends nominate titles and vo
 
 **1. Install the plugin.** In Jellyfin, open **Dashboard → Plugins → Repositories**, click **+**, and add:
 - Name: `Watch Party`
-- URL: `https://raw.githubusercontent.com/<your-github-name>/jellyfin-plugin-watchparty/main/manifest.json`
+- URL: `https://raw.githubusercontent.com/Bobbersonxd/jellyfin-plugin-watchparty/main/manifest.json`
 
 Then open **Catalog**, click **Watch Party → Install**, and restart Jellyfin.
 

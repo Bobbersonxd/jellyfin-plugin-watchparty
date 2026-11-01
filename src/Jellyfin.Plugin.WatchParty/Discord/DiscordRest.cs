@@ -48,7 +48,7 @@ public sealed class DiscordRest
                 {
                     Content = new StringContent(json, Encoding.UTF8, "application/json"),
                 };
-                request.Headers.UserAgent.ParseAdd("DiscordBot (https://github.com/jellyfin-watchparty, 1.0)");
+                request.Headers.UserAgent.ParseAdd("DiscordBot (https://github.com/Bobbersonxd/jellyfin-plugin-watchparty, 1.0)");
                 if (botToken is not null)
                 {
                     request.Headers.Authorization = new AuthenticationHeaderValue("Bot", botToken);

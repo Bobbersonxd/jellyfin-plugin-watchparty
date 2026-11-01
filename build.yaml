@@ -3,7 +3,7 @@ guid: "6f1c8a52-3d0e-4b7a-9c41-2e5d8f7a1b90"
 version: "1.0.0.0"
 targetAbi: "10.11.0.0"
 framework: "net9.0"
-owner: "bob"
+owner: "Bobbersonxd"
 overview: "Discord watch-party voting for Jellyfin"
 description: >
   Runs a Discord bot inside Jellyfin so a watch party can nominate titles,
