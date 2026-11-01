@@ -3,3 +3,4 @@ obj/
 .devserver/
 .superpowers/
 *.zip
+__pycache__/
