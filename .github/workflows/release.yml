@@ -1,0 +1,56 @@
+name: Release
+
+# Push a tag like v1.0.0 to publish a release. The workflow tests, builds the plugin zip,
+# attaches it to a GitHub Release, and adds the version to manifest.json on main so
+# Jellyfin servers that added the repository URL see the update in their Catalog.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Work out version
+        id: v
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          IFS=. read -r a b c d <<< "$tag"
+          echo "version=${a:-0}.${b:-0}.${c:-0}.${d:-0}" >> "$GITHUB_OUTPUT"
+
+      - name: Test
+        run: dotnet test -c Release
+
+      - name: Build zip
+        run: |
+          dotnet build src/Jellyfin.Plugin.WatchParty -c Release \
+            -p:Version=${{ steps.v.outputs.version }} -p:AssemblyVersion=${{ steps.v.outputs.version }} -p:FileVersion=${{ steps.v.outputs.version }}
+          zip -j "watchparty_${{ steps.v.outputs.version }}.zip" src/Jellyfin.Plugin.WatchParty/bin/Release/net9.0/Jellyfin.Plugin.WatchParty.dll
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" "watchparty_${{ steps.v.outputs.version }}.zip" --title "Watch Party $GITHUB_REF_NAME" --generate-notes
+
+      - name: Update manifest.json
+        run: |
+          url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/watchparty_${{ steps.v.outputs.version }}.zip"
+          python3 dev/make-manifest.py "watchparty_${{ steps.v.outputs.version }}.zip" "${{ steps.v.outputs.version }}" "$url" manifest.json > manifest.new
+          mv manifest.new manifest.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add manifest.json
+          git commit -m "Release ${{ steps.v.outputs.version }}"
+          git push origin main
