@@ -1,64 +1,78 @@
 # Watch Party plugin: design spec
 
-Date: 2026-11-01. Status: awaiting review.
+Date: 2026-11-01. Revision 2: the Discord link is now a built-in Gateway bot, the plugin is installed from the Jellyfin catalog, and it targets 10.11.
 
 ## Goal
-A Jellyfin plugin that lets a Discord watch party control **one host Jellyfin session** (the screen being shared in Discord). Picking what to watch, pause/resume, skip and stop are all decided by timed votes. Other tools (Stream Deck, Home Assistant, curl) can push the same commands in through a secret-protected webhook.
+A Jellyfin plugin that lets a Discord watch party control **one host Jellyfin session** (the screen being shared in Discord). Picking what to watch, pause/resume, skip and stop are all decided by timed votes. Other tools on the host machine (Stream Deck, Home Assistant, curl) can push the same commands through a secret-protected webhook.
 
-Success means: from Discord, friends can nominate titles, vote one in, and it starts on the host screen. Mid-movie, `/pause` opens a vote and the host screen pauses once the vote passes. A member with the host role can skip any vote.
+**No extra installation on any OS.** The user adds a repository URL in Jellyfin, clicks Install, and pastes a Discord bot token into the plugin settings. There is no tunnel, port forwarding, reverse proxy, HTTPS setup, sidecar process or file copying. The plugin runs entirely inside Jellyfin on the host machine and only makes outbound connections.
 
-Out of scope for v1: SyncPlay groups, reading Discord voice-channel presence, keeping state across restarts, more than one host session, and multiple concurrent votes.
+Success means:
+- From Discord, friends can nominate titles, vote one in, and it starts on the host screen.
+- Mid-movie, `/pause` opens a vote and the host screen pauses once the vote passes.
+- A member with the host role can skip any vote.
+- Installing works from the Jellyfin catalog on Windows, Linux, macOS and Docker.
+
+Out of scope for v1: SyncPlay groups, Discord voice-channel presence, keeping state across restarts, more than one host session, multiple concurrent votes, and Jellyfin 12.
+
+## Platform and distribution
+- Target **Jellyfin 10.11** (`targetAbi 10.11.0.0`). Build against the NuGet packages `Jellyfin.Controller` and `Jellyfin.Model` `10.11.11` on `net9.0`.
+- The plugin is pure managed code with **no third-party runtime dependencies**. The Discord gateway and REST client are written on `System.Net.WebSockets.ClientWebSocket`, `HttpClient` and `System.Text.Json`. This avoids clashes with Jellyfin's own assemblies and keeps it working on every OS and architecture.
+- Distribution is a Jellyfin plugin repository. The GitHub repo hosts `manifest.json` on GitHub Pages or a raw URL. A GitHub Actions workflow builds a release zip on each tag (`jprm` or `dotnet publish` + zip + MD5 checksum) and updates the manifest. Users add the manifest URL under Dashboard → Plugins → Repositories.
 
 ## Integration model
-- **Discord → plugin:** a Discord application with its **Interactions Endpoint URL** set to `https://<public-host>/WatchParty/Discord`. Discord POSTs slash commands, autocomplete requests and button clicks there. Jellyfin must be reachable over public HTTPS, for example through a Cloudflare Tunnel.
-- **Plugin → Discord:** the plugin edits the original vote message through `PATCH /webhooks/{appId}/{interactionToken}/messages/@original`; the token is valid for 15 minutes, which is longer than any vote. An optional channel webhook URL posts "Now playing" and vote results.
-- **Generic webhook:** `POST /WatchParty/Command`, with header `X-WatchParty-Secret: <secret>` and body `{"action": "pause|resume|skip|stop|pick|cancel", "user": "<id>", "force": false, "vote": "yes|no|<index>"}`. A body carrying `vote` casts a ballot in the active vote; any other body starts a vote or runs the action.
+- **Discord ↔ plugin:** a Gateway bot runs inside the plugin as a hosted background service.
+  - It connects to `wss://gateway.discord.gg/?v=10&encoding=json`: HELLO, then heartbeat, then IDENTIFY with intents `0`. No privileged intents are needed for interactions.
+  - It handles `INTERACTION_CREATE`, and does RESUME or a full reconnect with backoff.
+  - It replies through `POST /interactions/{id}/{token}/callback` within 3 s.
+- **Outcome messages:** the plugin edits the original vote message with `PATCH /webhooks/{appId}/{token}/messages/@original`. The token lasts 15 minutes, which is longer than any vote. An optional channel webhook URL also posts results and "Now playing".
+- **Generic webhook:** `POST /WatchParty/Command`, with header `X-WatchParty-Secret: <secret>` and body `{"action": "pause|resume|skip|stop|pick|cancel", "user": "<id>", "force": false, "vote": "yes|no|<index>"}`. It is served on Jellyfin's own port for local tools. An empty secret turns it off.
+- **Bot status:** the settings page shows the bot status (Disconnected, Connecting, Connected as `<name>`, or Invalid token) and an "Invite bot" link built from the application ID, with scopes `bot applications.commands`. Slash commands are registered automatically when the bot connects.
 
 ## Voting rules
-- One active vote at a time. Starting another while one is open is refused with "vote in progress".
+- One active vote at a time. Starting another while one is open is refused with "A vote is already in progress".
 - **Yes/no votes** (pause, resume, skip, stop): the vote runs for `VoteDurationSeconds` (default 60) and passes when `yes > no` and `yes + no >= MinVoters` (default 1).
 - **Pick vote:** one option per nominee. When the timer ends, the option with the most votes wins and ties are broken at random. A pick with zero votes, or fewer voters than `MinVoters`, fails. The ballot clears after a successful pick.
 - Each user has one vote and can change it; the last click counts.
 - The person who starts a yes/no vote is automatically counted as a yes.
-- **Override:** a Discord member who has `HostRoleId` (or a generic webhook call with `force: true`) runs the action at once, and can `/cancelvote`.
-- Timer resolution uses an injected clock/scheduler so the engine is unit-testable.
+- **Override:** a member who has `HostRoleId` (or a generic webhook call with `force: true`) runs the action at once, and can `/cancelvote`.
 
 ## Ballot
-- `/nominate <title>` autocompletes against movies and episodes in the Jellyfin library (name search, at most 25 results, which is Discord's limit). The value is the item ID.
-- Duplicate titles are not added. The ballot holds at most 5 nominees, the number of buttons in one Discord row.
-- `/ballot` shows the current nominees. `/pick` needs at least 2 of them.
+- `/nominate <title>` autocompletes against movies and episodes in the library (at most 25 results) and adds the title to the ballot.
+- Duplicates are not added. The ballot holds at most 5 nominees. `/ballot` shows the nominees. `/pick` needs at least 2.
 
 ## Commands
 | Command | Effect |
 |---|---|
-| `/pause` `/resume` `/skip` `/stop` | Start a yes/no vote; host role or `force:true` runs it at once |
+| `/pause` `/resume` `/skip` `/stop` | Start a yes/no vote; host role + `force:true` runs it at once |
 | `/nominate <title>` | Add a title to the ballot |
 | `/ballot` | Show the nominees |
 | `/pick` | Start the pick vote |
-| `/cancelvote` | Cancel the active vote (host role only) |
+| `/cancelvote` | Cancel the active vote (host role) |
 | `/nowplaying` | Show what the host is playing |
 
-Skip means "next item in the queue" (the next episode). If nothing is queued, it stops playback.
+Skip means the next item in the queue. If nothing is queued, it stops playback.
 
 ## Components
 | Unit | Responsibility |
 |---|---|
-| `Plugin`, `PluginConfiguration`, `Configuration/configPage.html` | Registration and settings: `DiscordPublicKey`, `DiscordApplicationId`, `DiscordBotToken` (used only to register commands), `HostRoleId`, `ChannelWebhookUrl`, `HostDeviceName`, `VoteDurationSeconds`, `MinVoters`, `WebhookSecret` |
-| `Voting/VoteEngine` | Pure vote state machine: start, cast, tally, resolve, cancel; raises a `VoteResolved` event |
-| `Voting/Ballot` | Nominee list rules |
-| `Playback/HostController` | Finds the host session by device name through `ISessionManager`, sends playstate and play commands, reports what is playing |
-| `Discord/SignatureVerifier` | Ed25519 check of `timestamp + body` against the public key (BouncyCastle) |
-| `Discord/InteractionsController` | Handles PING, commands, autocomplete and buttons; replies within Discord's 3 s limit |
-| `Discord/DiscordClient` | Edits the original message, posts to the channel webhook, registers slash commands |
-| `Api/CommandController` | The generic webhook |
-| `Commands/CommandRouter` | Shared "vote or run now" logic used by both controllers |
+| `Plugin`, `PluginConfiguration`, `configPage.html` | Registration and settings: `DiscordBotToken`, `DiscordApplicationId`, `HostRoleId`, `ChannelWebhookUrl`, `HostDeviceName`, `VoteDurationSeconds`, `MinVoters`, `WebhookSecret`; bot status; invite link |
+| `Voting/VoteEngine`, `Voting/Ballot` | Pure vote state machine and nominee rules |
+| `Playback/HostController`, `Playback/LibrarySearch` | Host session control through `ISessionManager`; library search |
+| `Commands/CommandRouter` | Shared "vote or run now" logic and applying outcomes |
+| `Discord/GatewayClient` | WebSocket connection lifecycle: heartbeat, identify, resume, reconnect; raises interaction events |
+| `Discord/DiscordRest` | Interaction callbacks, message edits, command registration, channel webhook |
+| `Discord/InteractionHandler` | Maps an interaction payload to router calls and builds the response JSON |
+| `Discord/DiscordBotService` | `IHostedService` that starts and stops the gateway, restarts it when the token changes, and exposes the status |
+| `Api/CommandController` | Generic webhook and bot status endpoint |
 
 ## Error handling
-- Host session not found: no vote is started, and the reply is an ephemeral "Host screen offline". If the host disappears before a vote resolves, the result says it could not be applied.
-- Bad Discord signature: 401. Bad webhook secret: 401. An empty secret in the config turns the generic webhook off.
-- Discord API failures are logged and do not affect playback.
-- State is in memory only, so a restart drops the active vote and the ballot.
+- Host session not found: no vote is started, and the reply is an ephemeral "Host screen offline". If the host disappears before a vote resolves, the outcome says it could not be applied.
+- Gateway: close code 4004 (bad token) sets the status to Invalid token and stops reconnecting until the config changes. Any other disconnect reconnects with exponential backoff (1 s up to 60 s), resuming when possible.
+- Discord REST failures are logged and do not affect playback. HTTP 429 honours `retry_after`.
+- Generic webhook: an empty secret gives 404, and a wrong secret gives 401.
+- State is in memory only.
 
 ## Testing
-- xUnit: VoteEngine (majority, ties, minimum voters, changed votes, auto-yes for the starter, timeout, cancel), Ballot (duplicates, cap), SignatureVerifier (known-good and tampered signatures), CommandRouter with a fake host.
-- Manual: deploy to the local Jellyfin and drive the generic webhook with curl against a real playing client, then the Discord flow through a tunnel.
+- xUnit: VoteEngine, Ballot, CommandRouter (fake host), InteractionHandler mapping and JSON, GatewayClient protocol logic against a fake socket (heartbeat interval, identify payload, resume after a reconnect opcode, stop on 4004), CommandController.
+- Live: a throwaway Jellyfin 10.11.11 Podman container on port 8097. Install through the plugin repository flow (a local manifest served to the container) to prove the catalog install, then drive the generic webhook and a real Discord test server.
