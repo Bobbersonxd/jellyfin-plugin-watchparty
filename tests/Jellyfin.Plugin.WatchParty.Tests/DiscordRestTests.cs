@@ -77,4 +77,16 @@ public class DiscordRestTests
         var nominate = CommandDefinitions.All.Single(c => c!["name"]!.GetValue<string>() == "nominate")!;
         Assert.True(nominate["options"]![0]!["autocomplete"]!.GetValue<bool>());
     }
+
+    [Theory]
+    [InlineData("https://discord.com/api/webhooks/123456789012345678/AbCdEfGhIjKlMnOpQrStUvWxYz0123456789", "AbCdEfGhIjKlMnOpQrStUvWxYz0123456789")]
+    [InlineData("https://discord.com/api/v10/interactions/1/aW50ZXJhY3Rpb246MTIzNDU2Nzg5MDEyMzQ1Njc4OkFiQ2Q/callback", "aW50ZXJhY3Rpb246MTIzNDU2Nzg5MDEyMzQ1Njc4OkFiQ2Q")]
+    [InlineData("https://discord.com/api/v10/webhooks/app/aW50ZXJhY3Rpb246MTIzNDU2Nzg5MDEyMzQ1Njc4OkFiQ2Q/messages/@original", "aW50ZXJhY3Rpb246MTIzNDU2Nzg5MDEyMzQ1Njc4OkFiQ2Q")]
+    public void Redact_RemovesTokens(string url, string secret)
+    {
+        var redacted = DiscordRest.Redact(url);
+
+        Assert.DoesNotContain(secret, redacted);
+        Assert.StartsWith("/api/", redacted);
+    }
 }

@@ -7,6 +7,8 @@ public class PluginConfiguration : BasePluginConfiguration
 {
     public string DiscordBotToken { get; set; } = string.Empty;
 
+    public string GuildId { get; set; } = string.Empty;
+
     public string HostRoleId { get; set; } = string.Empty;
 
     public string ChannelWebhookUrl { get; set; } = string.Empty;

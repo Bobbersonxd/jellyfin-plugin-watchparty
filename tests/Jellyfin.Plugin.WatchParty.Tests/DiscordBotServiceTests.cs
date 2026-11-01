@@ -18,12 +18,14 @@ public sealed class DiscordBotServiceTests : IAsyncDisposable
     private readonly PluginConfiguration _config = new();
     private readonly ConcurrentQueue<string> _runs = new();
     private readonly CommandRouter _router;
+    private readonly InteractionHandler _handler;
     private readonly DiscordBotService _service;
 
     public DiscordBotServiceTests()
     {
         var engine = new VoteEngine(_time, new Random(1), () => new VoteSettings(60, 1));
         _router = new CommandRouter(engine, new Ballot(), _host, NullLogger<CommandRouter>.Instance);
+        _handler = new InteractionHandler(_router, new FakeLibrarySearch(), () => _config);
         var rest = new DiscordRest(new FakeHttpClientFactory(_http), NullLogger<DiscordRest>.Instance);
         _service = new DiscordBotService(
             async (token, ct) =>
@@ -135,5 +137,38 @@ public sealed class DiscordBotServiceTests : IAsyncDisposable
 
         await WaitUntil(() => _http.Requests.Count >= 1);
         Assert.Equal("https://discord.com/api/webhooks/1/abc", _http.Requests[0].Request.RequestUri!.ToString());
+    }
+
+    [Fact]
+    public async Task LateButtonReply_ResendsOutcomeAfterIt()
+    {
+        await _service.StartAsync(default);
+        var vote = (await _router.RequestAsync(VoteAction.Pause, "<@1>", false, "itok", default)).Vote!;
+        _http.BeforeRecord = request =>
+        {
+            if (request.RequestUri!.AbsolutePath.EndsWith("/callback", StringComparison.Ordinal))
+            {
+                _time.Advance(TimeSpan.FromSeconds(60)); // vote ends while the button reply is in flight
+            }
+
+            return Task.CompletedTask;
+        };
+        var click = System.Text.Json.JsonSerializer.SerializeToElement(new
+        {
+            id = "int2",
+            token = "clicktok",
+            type = 3,
+            guild_id = "555",
+            data = new { custom_id = $"wp:{vote.Id:N}:yes", component_type = 2 },
+            member = new { user = new { id = "2" }, roles = Array.Empty<string>() },
+        });
+
+        await _service.HandleInteractionAsync(_handler, click);
+
+        await WaitUntil(() => _http.Requests.Count >= 3);
+        var last = _http.Requests[^1];
+        Assert.Equal(HttpMethod.Patch, last.Request.Method);
+        Assert.Contains("ended", last.Body);
+        Assert.Contains("\"components\":[]", last.Body);
     }
 }

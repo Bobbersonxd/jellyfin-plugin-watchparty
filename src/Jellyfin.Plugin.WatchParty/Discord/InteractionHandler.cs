@@ -42,6 +42,15 @@ public sealed class InteractionHandler
             return Message("Use this in a server", ephemeral: true);
         }
 
+        var homeGuild = _config().GuildId.Trim();
+        if (homeGuild.Length > 0
+            && (!interaction.TryGetProperty("guild_id", out var guild) || guild.GetString() != homeGuild))
+        {
+            return type == 4
+                ? new JsonObject { ["type"] = AutocompleteResult, ["data"] = new JsonObject { ["choices"] = new JsonArray() } }
+                : Message("This bot only works in its home server", ephemeral: true);
+        }
+
         var user = $"<@{member.GetProperty("user").GetProperty("id").GetString()}>";
         var data = interaction.GetProperty("data");
 

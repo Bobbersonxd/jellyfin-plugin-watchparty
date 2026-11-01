@@ -14,9 +14,8 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4   # the tagged commit is what gets built
         with:
-          ref: main
           fetch-depth: 0
 
       - uses: actions/setup-dotnet@v4
@@ -47,7 +46,11 @@ jobs:
       - name: Update manifest.json
         run: |
           url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/watchparty_${{ steps.v.outputs.version }}.zip"
-          python3 dev/make-manifest.py "watchparty_${{ steps.v.outputs.version }}.zip" "${{ steps.v.outputs.version }}" "$url" manifest.json > manifest.new
+          zip="watchparty_${{ steps.v.outputs.version }}.zip"
+          cp dev/make-manifest.py dev/yaml_lite.py build.yaml "$RUNNER_TEMP/"
+          cp "$zip" "$RUNNER_TEMP/"
+          git checkout main
+          (cd "$RUNNER_TEMP" && python3 make-manifest.py "$zip" "${{ steps.v.outputs.version }}" "$url" "$GITHUB_WORKSPACE/manifest.json") > manifest.new
           mv manifest.new manifest.json
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

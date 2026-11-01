@@ -20,18 +20,20 @@ public class InteractionHandlerTests
     private readonly Ballot _ballot = new();
     private readonly CommandRouter _router;
     private readonly InteractionHandler _handler;
+    private readonly PluginConfiguration _config = new() { HostRoleId = HostRole };
 
     public InteractionHandlerTests()
     {
         var engine = new VoteEngine(_time, new Random(1), () => new VoteSettings(60, 1));
         _router = new CommandRouter(engine, _ballot, _host, NullLogger<CommandRouter>.Instance);
-        _handler = new InteractionHandler(_router, _search, () => new PluginConfiguration { HostRoleId = HostRole });
+        _handler = new InteractionHandler(_router, _search, () => _config);
     }
 
-    private static JsonElement Interaction(int type, object data, string userId = "1", string[]? roles = null, bool dm = false)
+    private static JsonElement Interaction(int type, object data, string userId = "1", string[]? roles = null, bool dm = false, string guildId = "555")
     {
         var obj = new Dictionary<string, object?>
         {
+            ["guild_id"] = dm ? null : guildId,
             ["id"] = "int1",
             ["token"] = "itok",
             ["type"] = type,
@@ -240,5 +242,40 @@ public class InteractionHandlerTests
 
         Assert.Empty(message["components"]!.AsArray());
         Assert.Contains("passed", message["content"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task OtherGuild_WhenGuildSet_RejectedEphemeral()
+    {
+        _config.GuildId = "555";
+
+        var response = await _handler.HandleAsync(Interaction(2, new { name = "pause" }, guildId: "666"), default);
+
+        Assert.True(IsEphemeral(response));
+        Assert.Null(_router.ActiveVote);
+    }
+
+    [Fact]
+    public async Task HomeGuild_WhenGuildSet_Works()
+    {
+        _config.GuildId = " 555 ";
+
+        await _handler.HandleAsync(Command("pause"), default);
+
+        Assert.NotNull(_router.ActiveVote);
+    }
+
+    [Fact]
+    public async Task OtherGuild_Autocomplete_ReturnsNoChoices()
+    {
+        _config.GuildId = "555";
+        _search.Items.Add(new Nominee(Guid.NewGuid(), "Alien"));
+
+        var response = await _handler.HandleAsync(
+            Interaction(4, new { name = "nominate", options = new[] { new { name = "title", type = 3, value = "alien", focused = true } } }, guildId: "666"),
+            default);
+
+        Assert.Equal(8, response["type"]!.GetValue<int>());
+        Assert.Empty(response["data"]!["choices"]!.AsArray());
     }
 }

@@ -30,6 +30,12 @@
                     </div>
                 </div>
                 <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="wpGuild">Your Discord server ID (recommended)</label>
+                    <input is="emby-input" type="text" id="wpGuild" inputmode="numeric" />
+                    <div class="fieldDescription">Only this server can control your TV. Turn on Developer Mode (Settings → Advanced), then right-click
+                        your server icon → Copy Server ID. Also turn off <b>Public Bot</b> on the Bot page of the Developer Portal so strangers can't add it.</div>
+                </div>
+                <div class="inputContainer">
                     <label class="inputLabel inputLabelUnfocused" for="wpHostRole">Host role ID (optional)</label>
                     <input is="emby-input" type="text" id="wpHostRole" inputmode="numeric" />
                     <div class="fieldDescription">Members with this role can use <code>force:true</code> to skip the vote, and can <code>/cancelvote</code>.
@@ -124,6 +130,7 @@
                 Dashboard.showLoadingMsg();
                 ApiClient.getPluginConfiguration(pluginId).then(function (config) {
                     field('wpBotToken').value = config.DiscordBotToken || '';
+                    field('wpGuild').value = config.GuildId || '';
                     field('wpHostRole').value = config.HostRoleId || '';
                     field('wpChannelWebhook').value = config.ChannelWebhookUrl || '';
                     field('wpHostDevice').value = config.HostDeviceName || '';
@@ -146,10 +153,11 @@
                 Dashboard.showLoadingMsg();
                 ApiClient.getPluginConfiguration(pluginId).then(function (config) {
                     config.DiscordBotToken = field('wpBotToken').value.trim();
+                    config.GuildId = field('wpGuild').value.trim();
                     config.HostRoleId = field('wpHostRole').value.trim();
                     config.ChannelWebhookUrl = field('wpChannelWebhook').value.trim();
                     config.HostDeviceName = field('wpHostDevice').value.trim();
-                    config.VoteDurationSeconds = Math.max(5, parseInt(field('wpDuration').value, 10) || 60);
+                    config.VoteDurationSeconds = Math.min(600, Math.max(5, parseInt(field('wpDuration').value, 10) || 60));
                     config.MinVoters = Math.max(1, parseInt(field('wpMinVoters').value, 10) || 1);
                     config.WebhookSecret = field('wpSecret').value;
                     ApiClient.updatePluginConfiguration(pluginId, config).then(function (result) {

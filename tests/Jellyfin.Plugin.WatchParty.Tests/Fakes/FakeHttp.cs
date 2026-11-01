@@ -10,9 +10,17 @@ public sealed class FakeHttpHandler : HttpMessageHandler
 
     public List<(HttpRequestMessage Request, string Body)> Requests { get; } = [];
 
+    /// <summary>Runs before a request is recorded, i.e. while it is still "in flight".</summary>
+    public Func<HttpRequestMessage, Task>? BeforeRecord { get; set; }
+
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
     {
         var body = request.Content is null ? string.Empty : await request.Content.ReadAsStringAsync(ct);
+        if (BeforeRecord is { } hook)
+        {
+            await hook(request);
+        }
+
         lock (_gate)
         {
             Requests.Add((request, body));

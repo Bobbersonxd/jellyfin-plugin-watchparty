@@ -14,7 +14,12 @@ public enum VoteAction
 public sealed record VoteOption(string Key, string Label);
 
 /// <summary>Timing and quorum settings read when a vote starts and resolves.</summary>
-public sealed record VoteSettings(int DurationSeconds, int MinVoters);
+public sealed record VoteSettings(int DurationSeconds, int MinVoters)
+{
+    /// <summary>Clamps settings to what Discord can support: interaction tokens expire after 15 minutes.</summary>
+    public static VoteSettings FromConfig(Configuration.PluginConfiguration config) =>
+        new(Math.Clamp(config.VoteDurationSeconds, 5, 600), Math.Max(1, config.MinVoters));
+}
 
 /// <summary>Result of casting a vote.</summary>
 public enum CastStatus

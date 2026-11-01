@@ -20,7 +20,7 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton(sp => new VoteEngine(
             TimeProvider.System,
             new Random(),
-            () => new VoteSettings(config().VoteDurationSeconds, config().MinVoters)));
+            () => VoteSettings.FromConfig(config())));
         serviceCollection.AddSingleton<Ballot>();
         serviceCollection.AddSingleton<IHostController, HostController>();
         serviceCollection.AddSingleton<ILibrarySearch, LibrarySearch>();

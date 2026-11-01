@@ -19,7 +19,8 @@ Let your Discord watch party run the movie night. Friends nominate titles and vo
 2. Open **Bot**, click **Reset Token** and copy the token. Treat it like a password.
 3. In Jellyfin, open **Dashboard → Plugins → Watch Party**, paste the token and click **Save**.
 4. The status changes to **Connected as YourBot**. Click **Invite the bot to your Discord server**.
-5. Back on the settings page, choose the **Host device**: the Jellyfin player you screen-share. Start playing something on it first so it shows up in the list.
+5. **Lock it to your server.** Paste your **Server ID** into the settings (Discord Developer Mode → right-click your server icon → Copy Server ID). In the Developer Portal, also turn off **Bot → Public Bot**. Otherwise anyone who finds the bot could add it to their own server and vote on your TV.
+6. Back on the settings page, choose the **Host device**: the Jellyfin player you screen-share. Start playing something on it first so it shows up in the list.
 
 Optional settings:
 - **Host role ID:** members with this role can skip votes (`force:true`) and cancel them. To get the ID, turn on Discord's Developer Mode (Settings → Advanced), then right-click the role → **Copy Role ID**.

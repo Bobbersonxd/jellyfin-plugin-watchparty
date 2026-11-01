@@ -1,4 +1,6 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Jellyfin.Plugin.WatchParty.Commands;
 using Jellyfin.Plugin.WatchParty.Configuration;
 using Microsoft.Extensions.Hosting;
@@ -29,6 +31,8 @@ public sealed class DiscordBotService : IHostedService, IBotStatus, IDisposable
     private readonly ILogger<DiscordBotService> _log;
     private readonly GatewayClient? _gateway;
     private readonly object _gate = new();
+    private readonly ConcurrentDictionary<Guid, (string Token, JsonObject Message)> _finished = new();
+    private readonly ConcurrentQueue<Guid> _finishedOrder = new();
 
     private CancellationTokenSource? _cts;
     private Task _run = Task.CompletedTask;
@@ -39,7 +43,7 @@ public sealed class DiscordBotService : IHostedService, IBotStatus, IDisposable
         : this(gateway.RunAsync, () => gateway.ApplicationId, rest, router, config, log)
     {
         _gateway = gateway;
-        gateway.InteractionCreated += interaction => OnInteractionAsync(handler, interaction);
+        gateway.InteractionCreated += interaction => HandleInteractionAsync(handler, interaction);
         gateway.Ready += OnReadyAsync;
     }
 
@@ -155,13 +159,24 @@ public sealed class DiscordBotService : IHostedService, IBotStatus, IDisposable
         }
     }
 
-    private async Task OnInteractionAsync(InteractionHandler handler, JsonElement interaction)
+    internal async Task HandleInteractionAsync(InteractionHandler handler, JsonElement interaction)
     {
         var id = interaction.GetProperty("id").GetString()!;
         var token = interaction.GetProperty("token").GetString()!;
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2.5));
         var response = await handler.HandleAsync(interaction, timeout.Token).ConfigureAwait(false);
         await _rest.RespondAsync(id, token, response, CancellationToken.None).ConfigureAwait(false);
+
+        // A button reply (type 7) races the end-of-vote edit. If the vote finished while the reply was
+        // in flight, the reply may have landed last and restored the live buttons, so send the result again.
+        if (response["type"]?.GetValue<int>() == 7
+            && interaction.GetProperty("data").TryGetProperty("custom_id", out var customId)
+            && InteractionHandler.TryParseCustomId(customId.GetString() ?? string.Empty, out var voteId, out _)
+            && _finished.TryGetValue(voteId, out var final)
+            && _applicationId() is { } appId)
+        {
+            await _rest.EditOriginalAsync(appId, final.Token, final.Message, CancellationToken.None).ConfigureAwait(false);
+        }
     }
 
     private async Task OnReadyAsync()
@@ -183,7 +198,15 @@ public sealed class DiscordBotService : IHostedService, IBotStatus, IDisposable
     {
         if (outcome.Result.Vote.DiscordToken is { } interactionToken && _applicationId() is { } appId)
         {
-            await _rest.EditOriginalAsync(appId, interactionToken, InteractionHandler.OutcomeMessage(outcome), CancellationToken.None).ConfigureAwait(false);
+            var message = InteractionHandler.OutcomeMessage(outcome);
+            _finished[outcome.Result.Vote.Id] = (interactionToken, message);
+            _finishedOrder.Enqueue(outcome.Result.Vote.Id);
+            while (_finishedOrder.Count > 20 && _finishedOrder.TryDequeue(out var oldest))
+            {
+                _finished.TryRemove(oldest, out _);
+            }
+
+            await _rest.EditOriginalAsync(appId, interactionToken, message, CancellationToken.None).ConfigureAwait(false);
         }
 
         var webhook = _config().ChannelWebhookUrl.Trim();

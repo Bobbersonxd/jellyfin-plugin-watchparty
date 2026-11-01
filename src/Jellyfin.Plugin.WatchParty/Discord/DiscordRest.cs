@@ -98,11 +98,10 @@ public sealed class DiscordRest
         return TimeSpan.FromSeconds(1);
     }
 
-    /// <summary>Interaction and webhook tokens are secrets; keep them out of logs.</summary>
-    private static string Redact(string url)
+    /// <summary>Interaction and webhook tokens are secrets; replace every long path segment so none reach the logs.</summary>
+    internal static string Redact(string url)
     {
-        var uri = new Uri(url);
-        var segments = uri.AbsolutePath.Split('/');
-        return string.Join('/', segments.Take(Math.Min(segments.Length, 5))) + "/…";
+        var path = Uri.TryCreate(url, UriKind.Absolute, out var uri) ? uri.AbsolutePath : "/";
+        return string.Join('/', path.Split('/').Select(segment => segment.Length > 20 ? "…" : segment));
     }
 }
