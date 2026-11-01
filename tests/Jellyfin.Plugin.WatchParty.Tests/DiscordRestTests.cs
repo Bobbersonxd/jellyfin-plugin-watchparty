@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json.Nodes;
 using Jellyfin.Plugin.WatchParty.Discord;
+using Jellyfin.Plugin.WatchParty.Tests.Fakes;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -8,31 +9,12 @@ namespace Jellyfin.Plugin.WatchParty.Tests;
 
 public class DiscordRestTests
 {
-    private sealed class Handler : HttpMessageHandler
-    {
-        public Queue<HttpResponseMessage> Responses { get; } = new();
-
-        public List<(HttpRequestMessage Request, string Body)> Requests { get; } = [];
-
-        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
-        {
-            var body = request.Content is null ? string.Empty : await request.Content.ReadAsStringAsync(ct);
-            Requests.Add((request, body));
-            return Responses.Count > 0 ? Responses.Dequeue() : new HttpResponseMessage(HttpStatusCode.NoContent);
-        }
-    }
-
-    private sealed class Factory(HttpMessageHandler handler) : IHttpClientFactory
-    {
-        public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
-    }
-
-    private readonly Handler _handler = new();
+    private readonly FakeHttpHandler _handler = new();
     private readonly DiscordRest _rest;
 
     public DiscordRestTests()
     {
-        _rest = new DiscordRest(new Factory(_handler), NullLogger<DiscordRest>.Instance);
+        _rest = new DiscordRest(new FakeHttpClientFactory(_handler), NullLogger<DiscordRest>.Instance);
     }
 
     [Fact]
