@@ -33,7 +33,18 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
             TimeProvider.System,
             new Random(),
             sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<GatewayClient>>()));
-        serviceCollection.AddSingleton<InteractionHandler>();
+        serviceCollection.AddSingleton(sp => new InteractionHandler(
+            sp.GetRequiredService<CommandRouter>(),
+            sp.GetRequiredService<ILibrarySearch>(),
+            config,
+            guildId =>
+            {
+                if (Plugin.Instance is { } plugin)
+                {
+                    plugin.Configuration.GuildId = guildId;
+                    plugin.SaveConfiguration();
+                }
+            }));
         serviceCollection.AddSingleton<DiscordBotService>();
         serviceCollection.AddSingleton<IBotStatus>(sp => sp.GetRequiredService<DiscordBotService>());
         serviceCollection.AddHostedService(sp => sp.GetRequiredService<DiscordBotService>());

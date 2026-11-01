@@ -6,24 +6,28 @@ Let your Discord watch party run the movie night. Friends nominate titles and vo
 - **Outbound only.** The bot connects out to Discord, the way a browser does, so your server never has to be reachable from the internet.
 - Requires **Jellyfin 10.11**.
 
-## Install
+## Setup in 3 steps
 
-1. In Jellyfin, open **Dashboard → Plugins → Repositories** (on some versions this is under the **Catalog** tab, behind the gear icon) and add:
-   - Name: `Watch Party`
-   - URL: `https://raw.githubusercontent.com/<your-github-name>/jellyfin-plugin-watchparty/main/manifest.json`
-2. Open **Catalog**, find **Watch Party**, click **Install**, then restart Jellyfin.
+**1. Install the plugin.** In Jellyfin, open **Dashboard → Plugins → Repositories**, click **+**, and add:
+- Name: `Watch Party`
+- URL: `https://raw.githubusercontent.com/<your-github-name>/jellyfin-plugin-watchparty/main/manifest.json`
 
-## Set up the Discord bot (about 2 minutes)
+Then open **Catalog**, click **Watch Party → Install**, and restart Jellyfin.
 
-1. Go to [discord.com/developers/applications](https://discord.com/developers/applications) and click **New Application**.
-2. Open **Bot**, click **Reset Token** and copy the token. Treat it like a password.
-3. In Jellyfin, open **Dashboard → Plugins → Watch Party**, paste the token and click **Save**.
-4. The status changes to **Connected as YourBot**. Click **Invite the bot to your Discord server**.
-5. **Lock it to your server.** Paste your **Server ID** into the settings (Discord Developer Mode → right-click your server icon → Copy Server ID). In the Developer Portal, also turn off **Bot → Public Bot**. Otherwise anyone who finds the bot could add it to their own server and vote on your TV.
-6. Back on the settings page, choose the **Host device**: the Jellyfin player you screen-share. Start playing something on it first so it shows up in the list.
+**2. Make a Discord bot and paste its token.** This takes about 2 minutes:
+1. Go to [discord.com/developers/applications](https://discord.com/developers/applications) and click **New Application**. The name you choose becomes the bot's name.
+2. On the **Installation** page, set **Install Link** to **None** and click Save Changes.
+3. On the **Bot** page, turn off **Public Bot**. Then click **Reset Token** → **Copy**.
+4. In Jellyfin, open **Dashboard → Plugins → Watch Party**, paste the token and click **Save**.
 
-Optional settings:
-- **Host role ID:** members with this role can skip votes (`force:true`) and cancel them. To get the ID, turn on Discord's Developer Mode (Settings → Advanced), then right-click the role → **Copy Role ID**.
+**3. Invite the bot.** The settings page shows **Bot connected** and an **Invite** link. Click it, choose your server, then type `/nowplaying` in any channel.
+
+That's it. The bot locks itself to that server, and whatever Jellyfin player is playing becomes the host screen. The settings page has a checklist that turns green as each step is done.
+
+### Optional settings (under "Advanced")
+- **Host device:** always control one specific player, instead of whichever is playing.
+- **Host role ID:** members with this role can skip votes (`force:true`) and cancel them.
+- **Vote length** and **Minimum voters**.
 - **Announcement webhook URL:** also posts each vote result to a channel.
 
 ## Commands

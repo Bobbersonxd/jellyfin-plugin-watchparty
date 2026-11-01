@@ -39,7 +39,7 @@ public sealed class HostController : IHostController
             hasNext = index >= 0 && index < queue.Count - 1;
         }
 
-        return new HostStatus(true, session.NowPlayingItem?.Name, hasNext);
+        return new HostStatus(true, session.NowPlayingItem?.Name, hasNext, session.DeviceName);
     }
 
     public async Task<bool> SendAsync(VoteAction action, CancellationToken ct)
@@ -94,13 +94,10 @@ public sealed class HostController : IHostController
 
     private SessionInfo? FindHost()
     {
-        var name = _config().HostDeviceName;
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            return null;
-        }
-
-        return _sessions.Sessions.FirstOrDefault(s =>
-            s.SupportsRemoteControl && string.Equals(s.DeviceName, name, StringComparison.OrdinalIgnoreCase));
+        var sessions = _sessions.Sessions.ToArray();
+        var picked = HostPicker.Pick(
+            sessions.Select(s => new HostCandidate(s.Id, s.DeviceName ?? string.Empty, s.SupportsRemoteControl, s.NowPlayingItem is not null, s.LastActivityDate)),
+            _config().HostDeviceName ?? string.Empty);
+        return picked is null ? null : sessions.FirstOrDefault(s => s.Id == picked.SessionId);
     }
 }

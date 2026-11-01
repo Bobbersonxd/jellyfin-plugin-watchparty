@@ -21,12 +21,17 @@ public class InteractionHandlerTests
     private readonly CommandRouter _router;
     private readonly InteractionHandler _handler;
     private readonly PluginConfiguration _config = new() { HostRoleId = HostRole };
+    private int _saves;
 
     public InteractionHandlerTests()
     {
         var engine = new VoteEngine(_time, new Random(1), () => new VoteSettings(60, 1));
         _router = new CommandRouter(engine, _ballot, _host, NullLogger<CommandRouter>.Instance);
-        _handler = new InteractionHandler(_router, _search, () => _config);
+        _handler = new InteractionHandler(_router, _search, () => _config, id =>
+        {
+            _config.GuildId = id;
+            _saves++;
+        });
     }
 
     private static JsonElement Interaction(int type, object data, string userId = "1", string[]? roles = null, bool dm = false, string guildId = "555")
@@ -277,5 +282,27 @@ public class InteractionHandlerTests
 
         Assert.Equal(8, response["type"]!.GetValue<int>());
         Assert.Empty(response["data"]!["choices"]!.AsArray());
+    }
+
+    [Fact]
+    public async Task EmptyGuild_FirstInteraction_LocksAndSaves()
+    {
+        await _handler.HandleAsync(Command("pause"), default);
+
+        Assert.Equal("555", _config.GuildId);
+        Assert.Equal(1, _saves);
+        Assert.NotNull(_router.ActiveVote);
+    }
+
+    [Fact]
+    public async Task AfterLock_OtherGuild_Rejected()
+    {
+        await _handler.HandleAsync(Command("nowplaying"), default);
+
+        var response = await _handler.HandleAsync(Interaction(2, new { name = "pause" }, guildId: "666"), default);
+
+        Assert.True(IsEphemeral(response));
+        Assert.Null(_router.ActiveVote);
+        Assert.Equal(1, _saves);
     }
 }

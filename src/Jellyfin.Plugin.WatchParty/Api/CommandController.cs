@@ -3,6 +3,7 @@ using System.Text;
 using Jellyfin.Plugin.WatchParty.Commands;
 using Jellyfin.Plugin.WatchParty.Configuration;
 using Jellyfin.Plugin.WatchParty.Discord;
+using Jellyfin.Plugin.WatchParty.Playback;
 using Jellyfin.Plugin.WatchParty.Voting;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -28,7 +29,7 @@ public sealed class CommandRequest
 
 public sealed record CommandResponse(string Kind, string Message, Guid? VoteId);
 
-public sealed record BotStatusResponse(string State, string? BotUserName, string? ApplicationId, string? InviteUrl);
+public sealed record BotStatusResponse(string State, string? BotUserName, string? ApplicationId, string? InviteUrl, string? HomeGuildId, string? HostDevice, string? NowPlaying);
 
 /// <summary>Generic webhook for local tools, plus bot status for the settings page.</summary>
 [ApiController]
@@ -38,9 +39,11 @@ public sealed class CommandController : ControllerBase
     private readonly CommandRouter _router;
     private readonly Func<PluginConfiguration> _config;
     private readonly IBotStatus _bot;
+    private readonly IHostController _host;
 
-    public CommandController(CommandRouter router, Func<PluginConfiguration> config, IBotStatus bot)
+    public CommandController(CommandRouter router, Func<PluginConfiguration> config, IBotStatus bot, IHostController host)
     {
+        _host = host;
         _router = router;
         _config = config;
         _bot = bot;
@@ -106,7 +109,16 @@ public sealed class CommandController : ControllerBase
     {
         var appId = _bot.ApplicationId;
         var invite = appId is null ? null : $"https://discord.com/oauth2/authorize?client_id={appId}&scope=bot%20applications.commands&permissions=0";
-        return Ok(new BotStatusResponse(_bot.State.ToString(), _bot.BotUserName, appId, invite));
+        var host = _host.GetStatus();
+        var guild = _config().GuildId.Trim();
+        return Ok(new BotStatusResponse(
+            _bot.State.ToString(),
+            _bot.BotUserName,
+            appId,
+            invite,
+            guild.Length > 0 ? guild : null,
+            host.Online ? host.DeviceName : null,
+            host.Online ? host.NowPlayingTitle : null));
     }
 
     private ObjectResult Reply(RouterReply reply)

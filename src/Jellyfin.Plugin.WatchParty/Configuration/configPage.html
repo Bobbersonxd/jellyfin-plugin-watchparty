@@ -6,73 +6,100 @@
 </head>
 <body>
 <div id="WatchPartyConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-checkbox">
+    <style>
+        #WatchPartyConfigPage .wp-steps { list-style: none; padding: 0; margin: 0 0 1.5em; }
+        #WatchPartyConfigPage .wp-step { display: flex; gap: .8em; align-items: flex-start; padding: .9em 1em; margin-bottom: .5em; border-radius: .4em; background: rgba(127,127,127,.12); }
+        #WatchPartyConfigPage .wp-mark { flex: none; width: 1.6em; height: 1.6em; border-radius: 50%; display: grid; place-items: center; font-weight: bold; background: rgba(127,127,127,.35); }
+        #WatchPartyConfigPage .wp-step.done .wp-mark { background: #2e7d32; color: #fff; }
+        #WatchPartyConfigPage .wp-step.bad .wp-mark { background: #c62828; color: #fff; }
+        #WatchPartyConfigPage .wp-step h3 { margin: 0 0 .2em; font-size: 1.05em; }
+        #WatchPartyConfigPage .wp-step p { margin: .2em 0 0; opacity: .85; }
+        #WatchPartyConfigPage details { margin: 1em 0; }
+        #WatchPartyConfigPage summary { cursor: pointer; font-weight: bold; padding: .4em 0; }
+        #WatchPartyConfigPage ol.wp-howto li { margin-bottom: .4em; }
+    </style>
     <div data-role="content">
         <div class="content-primary">
             <h2 class="sectionTitle">Watch Party</h2>
-            <p>Let a Discord watch party vote to pause, resume, skip, stop, and pick what plays on one host screen.
-               The bot connects out to Discord from this server, so nothing needs to be exposed to the internet.</p>
+            <p>Your Discord server votes to pause, resume, skip, stop and pick what plays. The bot runs inside Jellyfin and
+               only connects out to Discord, so you don't need to open ports or set up anything else.</p>
 
-            <div class="verticalSection" style="padding:1em;border-radius:.3em;background:rgba(127,127,127,.12);margin-bottom:1.5em">
-                <h3 style="margin-top:0">Bot status: <span id="wpStatus">…</span></h3>
-                <p id="wpStatusHelp" class="fieldDescription"></p>
-                <p><a id="wpInvite" is="emby-linkbutton" class="button-link" href="#" target="_blank" rel="noopener" style="display:none">Invite the bot to your Discord server</a></p>
-            </div>
+            <ul class="wp-steps">
+                <li class="wp-step" id="wpStep1">
+                    <span class="wp-mark">1</span>
+                    <div><h3 id="wpStep1Title">Connect your Discord bot</h3><p id="wpStep1Text">Paste a bot token below and press Save.</p></div>
+                </li>
+                <li class="wp-step" id="wpStep2">
+                    <span class="wp-mark">2</span>
+                    <div>
+                        <h3 id="wpStep2Title">Add the bot to your server</h3>
+                        <p id="wpStep2Text">Once the bot is connected, an invite link appears here.</p>
+                        <p><a id="wpInvite" class="button-link" href="#" target="_blank" rel="noopener" style="display:none">Invite the bot to your Discord server</a></p>
+                    </div>
+                </li>
+                <li class="wp-step" id="wpStep3">
+                    <span class="wp-mark">3</span>
+                    <div><h3 id="wpStep3Title">Play something on the screen you share</h3><p id="wpStep3Text">Start playing in any Jellyfin app. It becomes the host screen.</p></div>
+                </li>
+            </ul>
 
             <form id="WatchPartyConfigForm">
-                <h3>Discord</h3>
                 <div class="inputContainer">
-                    <label class="inputLabel inputLabelUnfocused" for="wpBotToken">Bot token</label>
+                    <label class="inputLabel inputLabelUnfocused" for="wpBotToken">Discord bot token</label>
                     <input is="emby-input" type="password" id="wpBotToken" autocomplete="off" />
-                    <div class="fieldDescription">
-                        1. Open <a href="https://discord.com/developers/applications" target="_blank" rel="noopener">discord.com/developers/applications</a> and create (or open) your application.<br>
-                        2. Go to <b>Bot</b>, press <b>Reset Token</b>, copy it and paste it here, then Save.<br>
-                        3. Use the invite link above to add the bot to your server. Slash commands appear within a minute.
+                </div>
+
+                <details>
+                    <summary>How to make a bot (about 2 minutes)</summary>
+                    <ol class="wp-howto">
+                        <li>Open <a href="https://discord.com/developers/applications" target="_blank" rel="noopener">discord.com/developers/applications</a> and click <b>New Application</b>. The name you pick is the bot's name.</li>
+                        <li><b>Installation</b> page: set <b>Install Link</b> to <b>None</b> and click Save Changes.</li>
+                        <li><b>Bot</b> page: turn off <b>Public Bot</b> (so strangers can't add it), then click <b>Reset Token</b> → <b>Copy</b>.</li>
+                        <li>Paste the token above and click <b>Save</b>. Step 1 turns green and step 2 shows the invite link.</li>
+                    </ol>
+                </details>
+
+                <details>
+                    <summary>Advanced (optional)</summary>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="wpHostDevice">Host device name</label>
+                        <input is="emby-input" type="text" id="wpHostDevice" list="wpDevices" />
+                        <datalist id="wpDevices"></datalist>
+                        <div class="fieldDescription">Leave empty to use whichever Jellyfin player is playing. Set it to always control one device.</div>
                     </div>
-                </div>
-                <div class="inputContainer">
-                    <label class="inputLabel inputLabelUnfocused" for="wpGuild">Your Discord server ID (recommended)</label>
-                    <input is="emby-input" type="text" id="wpGuild" inputmode="numeric" />
-                    <div class="fieldDescription">Only this server can control your TV. Turn on Developer Mode (Settings → Advanced), then right-click
-                        your server icon → Copy Server ID. Also turn off <b>Public Bot</b> on the Bot page of the Developer Portal so strangers can't add it.</div>
-                </div>
-                <div class="inputContainer">
-                    <label class="inputLabel inputLabelUnfocused" for="wpHostRole">Host role ID (optional)</label>
-                    <input is="emby-input" type="text" id="wpHostRole" inputmode="numeric" />
-                    <div class="fieldDescription">Members with this role can use <code>force:true</code> to skip the vote, and can <code>/cancelvote</code>.
-                        In Discord, turn on Settings → Advanced → Developer Mode, then right-click the role → Copy Role ID.</div>
-                </div>
-                <div class="inputContainer">
-                    <label class="inputLabel inputLabelUnfocused" for="wpChannelWebhook">Announcement webhook URL (optional)</label>
-                    <input is="emby-input" type="url" id="wpChannelWebhook" />
-                    <div class="fieldDescription">Also posts every vote result to a channel. Channel settings → Integrations → Webhooks → Copy Webhook URL.</div>
-                </div>
-
-                <h3>Host screen</h3>
-                <div class="inputContainer">
-                    <label class="inputLabel inputLabelUnfocused" for="wpHostDevice">Host device name</label>
-                    <input is="emby-input" type="text" id="wpHostDevice" list="wpDevices" />
-                    <datalist id="wpDevices"></datalist>
-                    <div class="fieldDescription">The Jellyfin player you screen-share. Start playing something on it and it appears in this list.</div>
-                </div>
-
-                <h3>Voting</h3>
-                <div class="inputContainer">
-                    <label class="inputLabel inputLabelUnfocused" for="wpDuration">Vote length (seconds)</label>
-                    <input is="emby-input" type="number" id="wpDuration" min="5" max="600" />
-                </div>
-                <div class="inputContainer">
-                    <label class="inputLabel inputLabelUnfocused" for="wpMinVoters">Minimum voters</label>
-                    <input is="emby-input" type="number" id="wpMinVoters" min="1" max="100" />
-                    <div class="fieldDescription">A vote fails if fewer people than this voted. Yes/no votes pass when yes beats no.</div>
-                </div>
-
-                <h3>Webhook for other tools (optional)</h3>
-                <div class="inputContainer">
-                    <label class="inputLabel inputLabelUnfocused" for="wpSecret">Webhook secret</label>
-                    <input is="emby-input" type="password" id="wpSecret" autocomplete="off" />
-                    <div class="fieldDescription">Leave empty to turn it off. Tools send <code>POST /WatchParty/Command</code> with header
-                        <code>X-WatchParty-Secret</code> and a body like <code>{"action":"pause","user":"streamdeck"}</code>.</div>
-                </div>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="wpGuild">Home Discord server ID</label>
+                        <input is="emby-input" type="text" id="wpGuild" inputmode="numeric" />
+                        <div class="fieldDescription">Filled in automatically the first time someone uses a command. Only that server can control your screen.
+                            Clear it and Save to move the bot to another server.</div>
+                    </div>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="wpHostRole">Host role ID</label>
+                        <input is="emby-input" type="text" id="wpHostRole" inputmode="numeric" />
+                        <div class="fieldDescription">Members with this role can add <code>force:true</code> to skip the vote, and can <code>/cancelvote</code>.
+                            In Discord, turn on Settings → Advanced → Developer Mode, then right-click the role → Copy Role ID.</div>
+                    </div>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="wpDuration">Vote length (seconds, 5–600)</label>
+                        <input is="emby-input" type="number" id="wpDuration" min="5" max="600" />
+                    </div>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="wpMinVoters">Minimum voters</label>
+                        <input is="emby-input" type="number" id="wpMinVoters" min="1" max="100" />
+                        <div class="fieldDescription">A vote fails if fewer people than this voted. Yes/no votes pass when yes beats no.</div>
+                    </div>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="wpChannelWebhook">Announcement webhook URL</label>
+                        <input is="emby-input" type="url" id="wpChannelWebhook" />
+                        <div class="fieldDescription">Also posts every vote result to a channel. Channel settings → Integrations → Webhooks → Copy Webhook URL.</div>
+                    </div>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="wpSecret">Webhook secret for other tools</label>
+                        <input is="emby-input" type="password" id="wpSecret" autocomplete="off" />
+                        <div class="fieldDescription">Leave empty to turn it off. Tools send <code>POST /WatchParty/Command</code> with header
+                            <code>X-WatchParty-Secret</code> and a body like <code>{"action":"pause","user":"streamdeck"}</code>.</div>
+                    </div>
+                </details>
 
                 <button is="emby-button" type="submit" class="raised button-submit block emby-button"><span>Save</span></button>
             </form>
@@ -85,29 +112,48 @@
             var page = document.querySelector('#WatchPartyConfigPage');
             var timer = null;
 
-            var help = {
-                Disconnected: 'Paste a bot token below and press Save.',
-                Connecting: 'Connecting to Discord…',
-                Connected: 'The bot is online. Use the commands in any server it has joined.',
-                InvalidToken: 'Discord rejected this token. Reset it in the Developer Portal and paste the new one.'
-            };
-
             function field(id) { return page.querySelector('#' + id); }
 
+            function step(n, state, title, text) {
+                var el = field('wpStep' + n);
+                el.classList.toggle('done', state === 'done');
+                el.classList.toggle('bad', state === 'bad');
+                el.querySelector('.wp-mark').textContent = state === 'done' ? '✓' : (state === 'bad' ? '!' : String(n));
+                field('wpStep' + n + 'Title').textContent = title;
+                field('wpStep' + n + 'Text').textContent = text;
+            }
+
+            function render(s) {
+                if (s.State === 'Connected') {
+                    step(1, 'done', 'Bot connected as ' + (s.BotUserName || 'your bot'), 'Discord is connected. Commands are registered automatically.');
+                } else if (s.State === 'InvalidToken') {
+                    step(1, 'bad', 'Discord rejected the token', 'Reset the token on the Bot page of the Developer Portal, paste the new one, and click Save.');
+                } else if (s.State === 'Connecting') {
+                    step(1, '', 'Connecting to Discord…', 'This usually takes a few seconds.');
+                } else {
+                    step(1, '', 'Connect your Discord bot', 'Paste a bot token below and click Save. Open "How to make a bot" if you don\'t have one yet.');
+                }
+
+                var invite = field('wpInvite');
+                invite.style.display = s.InviteUrl ? '' : 'none';
+                if (s.InviteUrl) { invite.href = s.InviteUrl; }
+                if (s.HomeGuildId) {
+                    step(2, 'done', 'Bot added to your server', 'Locked to server ' + s.HomeGuildId + '. Other servers can\'t use it.');
+                } else if (s.InviteUrl) {
+                    step(2, '', 'Add the bot to your server', 'Use the invite link, then type /nowplaying in any channel to finish.');
+                } else {
+                    step(2, '', 'Add the bot to your server', 'Once the bot is connected, an invite link appears here.');
+                }
+
+                if (s.HostDevice) {
+                    step(3, 'done', 'Host screen: ' + s.HostDevice, s.NowPlaying ? 'Playing ' + s.NowPlaying + '.' : 'Nothing is playing right now.');
+                } else {
+                    step(3, '', 'Play something on the screen you share', 'Start playing in any Jellyfin app. It becomes the host screen.');
+                }
+            }
+
             function refreshStatus() {
-                ApiClient.getJSON(ApiClient.getUrl('WatchParty/Status')).then(function (s) {
-                    field('wpStatus').textContent = s.State === 'Connected' && s.BotUserName ? 'Connected as ' + s.BotUserName : s.State;
-                    field('wpStatusHelp').textContent = help[s.State] || '';
-                    var invite = field('wpInvite');
-                    if (s.InviteUrl) {
-                        invite.href = s.InviteUrl;
-                        invite.style.display = '';
-                    } else {
-                        invite.style.display = 'none';
-                    }
-                }).catch(function () {
-                    field('wpStatus').textContent = 'unknown';
-                });
+                ApiClient.getJSON(ApiClient.getUrl('WatchParty/Status')).then(render).catch(function () {});
             }
 
             function loadDevices() {
@@ -123,25 +169,26 @@
                         option.value = name;
                         list.appendChild(option);
                     });
-                });
+                }).catch(function () {});
+            }
+
+            function fill(config) {
+                field('wpBotToken').value = config.DiscordBotToken || '';
+                field('wpHostDevice').value = config.HostDeviceName || '';
+                field('wpGuild').value = config.GuildId || '';
+                field('wpHostRole').value = config.HostRoleId || '';
+                field('wpDuration').value = config.VoteDurationSeconds;
+                field('wpMinVoters').value = config.MinVoters;
+                field('wpChannelWebhook').value = config.ChannelWebhookUrl || '';
+                field('wpSecret').value = config.WebhookSecret || '';
             }
 
             page.addEventListener('pageshow', function () {
                 Dashboard.showLoadingMsg();
-                ApiClient.getPluginConfiguration(pluginId).then(function (config) {
-                    field('wpBotToken').value = config.DiscordBotToken || '';
-                    field('wpGuild').value = config.GuildId || '';
-                    field('wpHostRole').value = config.HostRoleId || '';
-                    field('wpChannelWebhook').value = config.ChannelWebhookUrl || '';
-                    field('wpHostDevice').value = config.HostDeviceName || '';
-                    field('wpDuration').value = config.VoteDurationSeconds;
-                    field('wpMinVoters').value = config.MinVoters;
-                    field('wpSecret').value = config.WebhookSecret || '';
-                    Dashboard.hideLoadingMsg();
-                });
+                ApiClient.getPluginConfiguration(pluginId).then(fill).finally(function () { Dashboard.hideLoadingMsg(); });
                 loadDevices();
                 refreshStatus();
-                timer = setInterval(refreshStatus, 5000);
+                timer = setInterval(function () { refreshStatus(); loadDevices(); }, 5000);
             });
 
             page.addEventListener('pagehide', function () {
@@ -153,17 +200,20 @@
                 Dashboard.showLoadingMsg();
                 ApiClient.getPluginConfiguration(pluginId).then(function (config) {
                     config.DiscordBotToken = field('wpBotToken').value.trim();
+                    config.HostDeviceName = field('wpHostDevice').value.trim();
                     config.GuildId = field('wpGuild').value.trim();
                     config.HostRoleId = field('wpHostRole').value.trim();
-                    config.ChannelWebhookUrl = field('wpChannelWebhook').value.trim();
-                    config.HostDeviceName = field('wpHostDevice').value.trim();
                     config.VoteDurationSeconds = Math.min(600, Math.max(5, parseInt(field('wpDuration').value, 10) || 60));
                     config.MinVoters = Math.max(1, parseInt(field('wpMinVoters').value, 10) || 1);
+                    config.ChannelWebhookUrl = field('wpChannelWebhook').value.trim();
                     config.WebhookSecret = field('wpSecret').value;
-                    ApiClient.updatePluginConfiguration(pluginId, config).then(function (result) {
+                    return ApiClient.updatePluginConfiguration(pluginId, config).then(function (result) {
                         Dashboard.processPluginConfigurationUpdateResult(result);
                         setTimeout(refreshStatus, 1500);
                     });
+                }).catch(function () {
+                    Dashboard.hideLoadingMsg();
+                    window.alert('Saving failed. Check the Jellyfin log.');
                 });
                 return false;
             });

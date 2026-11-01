@@ -21,9 +21,13 @@ public sealed class InteractionHandler
     private readonly CommandRouter _router;
     private readonly ILibrarySearch _search;
     private readonly Func<PluginConfiguration> _config;
+    private readonly Action<string>? _saveHomeGuild;
+    private readonly object _lockGate = new();
 
-    public InteractionHandler(CommandRouter router, ILibrarySearch search, Func<PluginConfiguration> config)
+    /// <param name="saveHomeGuild">Persists the server the bot locks to on first use.</param>
+    public InteractionHandler(CommandRouter router, ILibrarySearch search, Func<PluginConfiguration> config, Action<string>? saveHomeGuild = null)
     {
+        _saveHomeGuild = saveHomeGuild;
         _router = router;
         _search = search;
         _config = config;
@@ -42,9 +46,9 @@ public sealed class InteractionHandler
             return Message("Use this in a server", ephemeral: true);
         }
 
-        var homeGuild = _config().GuildId.Trim();
-        if (homeGuild.Length > 0
-            && (!interaction.TryGetProperty("guild_id", out var guild) || guild.GetString() != homeGuild))
+        var guildId = interaction.TryGetProperty("guild_id", out var guild) ? guild.GetString() : null;
+        var homeGuild = HomeGuild(guildId);
+        if (homeGuild.Length > 0 && guildId != homeGuild)
         {
             return type == 4
                 ? new JsonObject { ["type"] = AutocompleteResult, ["data"] = new JsonObject { ["choices"] = new JsonArray() } }
@@ -215,6 +219,22 @@ public sealed class InteractionHandler
         }
 
         return new JsonObject { ["type"] = AutocompleteResult, ["data"] = new JsonObject { ["choices"] = choices } };
+    }
+
+    /// <summary>The configured home server; locks to <paramref name="guildId"/> on first use when none is set.</summary>
+    private string HomeGuild(string? guildId)
+    {
+        lock (_lockGate)
+        {
+            var home = _config().GuildId.Trim();
+            if (home.Length == 0 && !string.IsNullOrEmpty(guildId) && _saveHomeGuild is not null)
+            {
+                _saveHomeGuild(guildId);
+                home = guildId;
+            }
+
+            return home;
+        }
     }
 
     private bool HasHostRole(JsonElement member)

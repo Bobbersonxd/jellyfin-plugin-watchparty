@@ -34,7 +34,7 @@ public class CommandControllerTests
     {
         var engine = new VoteEngine(_time, new Random(1), () => new VoteSettings(60, 1));
         _router = new CommandRouter(engine, _ballot, _host, NullLogger<CommandRouter>.Instance);
-        _controller = new CommandController(_router, () => _config, _bot);
+        _controller = new CommandController(_router, () => _config, _bot, _host);
     }
 
     private static int Status(IActionResult result) => result switch
@@ -157,5 +157,29 @@ public class CommandControllerTests
         var body = Assert.IsType<BotStatusResponse>(((ObjectResult)_controller.Status()).Value);
 
         Assert.Null(body.InviteUrl);
+    }
+
+    [Fact]
+    public void Status_IncludesHostAndHomeGuild()
+    {
+        _config.GuildId = "555";
+        _host.Status = new Playback.HostStatus(true, "Alien", false, "Firefox");
+
+        var body = Assert.IsType<BotStatusResponse>(((ObjectResult)_controller.Status()).Value);
+
+        Assert.Equal("555", body.HomeGuildId);
+        Assert.Equal("Firefox", body.HostDevice);
+        Assert.Equal("Alien", body.NowPlaying);
+    }
+
+    [Fact]
+    public void Status_NoHost_NullHostFields()
+    {
+        _host.Status = new Playback.HostStatus(false, null, false);
+
+        var body = Assert.IsType<BotStatusResponse>(((ObjectResult)_controller.Status()).Value);
+
+        Assert.Null(body.HostDevice);
+        Assert.Null(body.HomeGuildId);
     }
 }
